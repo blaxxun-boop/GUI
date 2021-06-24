@@ -97,12 +97,14 @@ namespace YeetMachine
                 {
                     if (menu is null)
                     {
-                        menu = Instantiate(customcanvas, GameObject.Find("IngameGui(Clone)").transform);
+                        menu = Instantiate(customcanvas);
                         menu.name = "guildoverlay";
                         menu.transform.SetSiblingIndex(menu.transform.GetSiblingIndex() - 4);
                     }
-
-                    menu.SetActive(!menu.activeSelf);
+                    else
+                    {
+                        menu.SetActive(!menu.activeSelf);
+                    }
                 }
             }
             finally
