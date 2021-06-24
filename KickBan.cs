@@ -3,6 +3,7 @@ using HarmonyLib;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using BepInEx.Configuration;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -16,9 +17,14 @@ namespace YeetMachine
         private Harmony _harmony;
         private AssetBundle uitest;
         private static GameObject customcanvas;
+        private static GameObject menu;
+
+        public static ConfigEntry<KeyCode> overlayKey;
 
         private void Awake()
         {
+            overlayKey = Config.Bind("1 - General", "Key to open overlay", KeyCode.O, new ConfigDescription("Key that opens the overlay"));
+
             LoadAssets();
             _harmony = Harmony.CreateAndPatchAll(Assembly.GetExecutingAssembly(), PluginId);
         }
@@ -64,24 +70,62 @@ namespace YeetMachine
                 return true;
             }
         }
-
-        [HarmonyPatch(typeof(ConnectPanel), "IsVisible")]
-        public static class ConnectPanel_Patch
-        {
-            public static void Prefix(ConnectPanel __instance)
-            {
-
-                var customkickmenu = Object.Instantiate(customcanvas, __instance.gameObject.transform, false);
-                var scrollbar = customkickmenu.GetComponentInChildren<Scrollbar>();
-                scrollbar = __instance.m_playerListScroll;
-                var text = customkickmenu.GetComponentInChildren<Text>().text;
-                text = __instance.m_activePeers.ToString();
-                customkickmenu.SetActive(true);
-            }
-        }
+        
         private void OnDestroy()
         {
             _harmony?.UnpatchSelf();
+        }
+        
+        private static bool ButtonPressed(KeyCode button)
+        {
+            try
+            {
+                return Input.GetKeyDown(button);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+        
+        private void Update()
+        {
+            PatchPlayerInputActive.skipOverlayActiveCheck = true;
+            try
+            {
+                if (ButtonPressed(overlayKey.Value) && (!Chat.instance || !Chat.instance.HasFocus()) && !Console.IsVisible() && !TextInput.IsVisible() && !StoreGui.IsVisible() && !InventoryGui.IsVisible() && !Menu.IsVisible() && (!TextViewer.instance || !TextViewer.instance.IsVisible()) && !Minimap.IsOpen() && !GameCamera.InFreeFly())
+                {
+                    if (menu is null)
+                    {
+                        menu = Instantiate(customcanvas, GameObject.Find("IngameGui(Clone)").transform);
+                        menu.name = "guildoverlay";
+                        menu.transform.SetSiblingIndex(menu.transform.GetSiblingIndex() - 4);
+                    }
+
+                    menu.SetActive(!menu.activeSelf);
+                }
+            }
+            finally
+            {
+                PatchPlayerInputActive.skipOverlayActiveCheck = false;
+            }
+        }
+
+        [HarmonyPatch(typeof(Menu), "IsVisible")]
+        class PatchPlayerInputActive
+        {
+            public static bool skipOverlayActiveCheck = false;
+
+            private static bool Prefix(ref bool __result)
+            {
+                if (menu != null && menu.gameObject.activeSelf && !skipOverlayActiveCheck)
+                {
+                    __result = true;
+                    return false;
+                }
+
+                return true;
+            }
         }
     }
 }
